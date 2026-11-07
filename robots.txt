@@ -1,0 +1,5 @@
+# robots.txt for https://agencyremediation.com/
+User-agent: *
+Allow: /
+
+Sitemap: https://agencyremediation.com/sitemap.xml
