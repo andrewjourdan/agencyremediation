@@ -1,0 +1,48 @@
+name: Site checks
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Validate static site
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check publishing files
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          host = Path("CNAME").read_text().strip()
+          assert host == "agencyremediation.com", "Unexpected Pages custom domain"
+          home = f"https://{host}/"
+
+          class Page(HTMLParser):
+              canonical = None
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == "link" and attrs.get("rel") == "canonical":
+                      self.canonical = attrs.get("href")
+
+          page = Page()
+          page.feed(Path("index.html").read_text())
+          page.close()
+          assert page.canonical == home, "Homepage canonical URL must match CNAME"
+
+          sitemap = ElementTree.parse("sitemap.xml")
+          locations = sitemap.findall("{*}url/{*}loc")
+          assert any(location.text == home for location in locations), "Homepage missing from sitemap"
+          assert f"Sitemap: {home}sitemap.xml" in Path("robots.txt").read_text().splitlines(), (
+              "robots.txt must reference the published sitemap"
+          )
+          PY
